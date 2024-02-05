@@ -1,0 +1,327 @@
+﻿@page "/articles"
+@using Alimentations.Repositories
+@using Alimentations.Models
+@using Microsoft.JSInterop
+@inject IJSRuntime JSRuntime
+@inject ArticleRepository ArticleRepo
+
+<h3>Gestion des articles</h3>
+
+
+<div class="mb-2">
+    
+    <button class="btn btn-primary" @onclick="OpenModal">Créer un article</button>
+    <button class="btn btn-primary" @onclick="ShowEditModal">Modifier cet article</button>
+    <button class="btn btn-danger" @onclick="DeleteSelected">Supprimer cet article</button>
+</div>
+@if (articles != null && articles.Count > 0)
+        {
+
+<table class="table table-responsive-lg">
+    <thead>
+        <tr>
+            <th></th>
+            <th>ID</th>
+            <th>Designation</th>
+            <th>Marque</th>
+            <th>Prix</th>
+            <th>Date</th>
+        </tr>
+    </thead>
+    <tbody>
+       
+            @foreach (var article in articles)
+            {
+                <tr>
+                    <td>
+                        <input type="checkbox" id="check-@article.ID" name="check" @onchange="@(async () => await ToggleSelectedRow(article.ID))" value="@article.ID"
+                               onclick="@(async () => await SetSelectedArticleIdForDeletion(article.ID))" />
+             
+                    </td>
+                
+
+
+                
+
+                    <td>@article.ID</td>
+                    <td>@article.Designation</td>
+                    <td>@article.Marque</td>
+                    <td>@article.Prix</td>
+                    <td>@article.Date.ToShortDateString()</td>
+                </tr>
+
+            }
+        
+    </tbody>
+       
+
+    </table>
+}else
+{
+<h1> No articles for now</h1>    
+}
+@if (showEditModal==true)
+{
+    <div class="modal show" tabindex="-1" role="dialog" style="display: block; border-radius: 8px;">
+        <!-- ... modal content ... -->
+
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Article</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" @onclick="HideEditModal">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <form>
+                        <div class="form-group">
+                            <label for="editId">ID:</label>
+                            <input type="text" class="form-control" id="editId" readonly value="@selectedArticle.ID" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="editDesignation">Designation:</label>
+                            <input type="text" class="form-control" id="editDesignation" @bind="selectedArticle.Designation"/>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="editMarque">Marque:</label>
+                            <input type="text" class="form-control" id="editMarque" @bind="selectedArticle.Marque" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="editPrix">Prix:</label>
+                            <input type="number" class="form-control" id="editPrix" @bind="selectedArticle.Prix" min="1" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="editDate">Date:</label>
+                            <input type="date" class="form-control" id="editDate" @bind="selectedArticle.Date" />
+                        </div>
+                    </form>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideEditModal">Close</button>
+                    <button type="button" class="btn btn-primary" @onclick="EditArticle">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@code{
+   
+
+}
+@code {
+    private bool showEditModal = false;
+    private ArticleModel selectedArticle;
+    private int selectedArticleIdForDeletion;
+    private void ShowEditModal()
+    {
+        showEditModal = true;
+    }
+
+    private void HideEditModal()
+    {
+        showEditModal = false;
+    }
+
+    async Task ToggleSelectedRow(int articleId)
+    {
+        if (selectedArticle != null && selectedArticle.ID == articleId)
+        {
+            selectedArticle = null;
+        }
+        else
+        {
+            selectedArticle = articles.FirstOrDefault(a => a.ID == articleId);
+        }
+    }
+    private async Task SetSelectedArticleIdForDeletion(int articleId)
+    {
+        if (selectedArticleIdForDeletion == articleId)
+        {
+            selectedArticleIdForDeletion = 0; 
+        }
+        else
+        {
+            selectedArticleIdForDeletion = articleId; // Select the article for deletion
+        }
+    }
+
+
+    private async Task EditArticle()
+    {
+        if (selectedArticle != null)
+        {
+            // Call the repository method to update the article
+            await ArticleRepo.UpdateArticle(selectedArticle.ID, selectedArticle.Designation, selectedArticle.Marque, selectedArticle.Prix, selectedArticle.Date);
+
+            // Close the edit modal
+            HideEditModal();
+        }
+    }
+    private async Task DeleteSelected()
+    {
+        if (selectedArticleIdForDeletion != 0)
+        {
+            try
+            {
+
+                await ArticleRepo.DeleteArticle(selectedArticleIdForDeletion);
+                await JSRuntime.InvokeVoidAsync("alert", $"Cet article a été supprimé");
+                selectedArticleIdForDeletion = 0;
+            }
+            catch (InvalidOperationException ex)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", $"Cet article existe déja dans une Alimentation");
+                
+            }
+
+
+           
+        }
+        articles = await ArticleRepo.GetArticles();
+    }
+
+
+
+   
+
+
+
+  
+
+
+}
+
+@if (isVisible==true)
+{
+    <div class="modal show" tabindex="-1" role="dialog" style="display: block; border-radius: 8px;">
+        <!-- ... modal content ... -->
+
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Article</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" @onclick="HideModal">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <form>
+                        <div class="form-group">
+                            <label for="id">Generated ID:</label>
+                            <input type="text" class="form-control" id="id" readonly value="@nextArticleId" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="designation">Designation:</label>
+                            <input type="text" class="form-control" id="designation" @bind="designation" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="marque">Marque:</label>
+                            <input type="text" class="form-control" id="marque" @bind="marque" />
+                        </div>
+
+                      <div class="form-group">
+    <label for="prix">Prix:</label>
+    <input type="number" class="form-control" id="prix" @bind="prix" min="1" />
+</div>
+
+                        <div class="form-group">
+                            <label for="date">Date:</label>
+                            <input type="date" class="form-control" id="date" @bind="date" />
+                        </div>
+                    </form>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideModal">Close</button>
+                    <button type="button" class="btn btn-primary" @onclick="AddArticle">Add Article</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@code {
+
+    List<ArticleModel> articles;
+
+    public string modalTitle = "";
+
+
+    private ArticleModel newArticle = new ArticleModel();
+   bool isVisible = false;
+
+// Input values for the new article
+string designation;
+string marque;
+decimal prix;
+DateTime date;
+
+// ID for the new article
+int nextArticleId;
+
+protected override async Task OnInitializedAsync()
+    { 
+        articles = await ArticleRepo.GetArticles();
+    // Retrieve the maximum existing ID from the database
+    nextArticleId = await ArticleRepo.GetMaxArticleId() + 1;
+}
+  
+async Task AddArticle()
+{
+    // Call the repository method to add the article
+    int generatedId = await ArticleRepo.AddArticle(nextArticleId, designation, marque, prix, date);
+
+    // Optionally, you can handle the generated ID or perform additional actions
+    Console.WriteLine($"Article added with ID: {generatedId}");
+
+    // Close the modal
+    HideModal();
+    ClearForm();
+        articles = await ArticleRepo.GetArticles();
+}
+
+void OpenModal()
+{
+    // Set today's date as the default
+    date = DateTime.Now.Date;
+        prix = 1;
+    isVisible = true;
+}
+
+void HideModal()
+{
+    isVisible = false;
+}
+
+void ClearForm()
+{
+    // Clear form fields
+    designation = string.Empty;
+    marque = string.Empty;
+    prix =1 ;
+    date = DateTime.Now.Date;
+}
+}
+
+      
+
+@code {
+
+
+ 
+
+  
+
+
+
+}
+

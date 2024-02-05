@@ -1,0 +1,226 @@
+﻿@page "/add"
+@using Alimentations.Models; 
+@using Alimentations.Repositories;
+@using System.Diagnostics;
+@inject AlimentationRepository _alimentationRepository;
+@inject ArticleRepository _articleRepository;
+@inject DepotRepository _depotRepository;
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+
+<h3>Create Alimentation</h3>
+<div class="card mx-auto" style="width: 60rem;">
+    <div class="card-body">
+        <div class="mb-3"> <label for="alimentationDate" class="form-label">Date de l'alimentation':</label> <input type="date" class="form-control" id="alimentationDate" @bind="selectedDate" /> </div>
+
+        @if (Depots != null)
+        {
+            <div class="mb-3">
+                <label for="depotDropdown" class="form-label">Choisir le Dépot:</label>
+                <select class="form-select" id="depotDropdown" @bind="selectedDepotId">
+                   
+                        <option selected>Open this select menu</option>
+                    @foreach (var depot in Depots)
+                    {
+                        <option value="@depot.ID">@depot.Designation, @depot.Ville</option>
+                    }
+                </select>
+            </div>
+        }
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#articleModal">
+           Ajouter les articles
+        </button>
+        <div class="modal fade" id="articleModal" tabindex="-1" aria-labelledby="articleModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="articleModalLabel">Choisir les articles</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (Articles != null)
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Choose Articles:</label>
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>ID</th>
+                                            <th>Designation</th>
+                                            <th>Marque</th>
+                                            <th>Prix</th>
+                                            <th>Quantity</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var article in Articles)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <input type="checkbox" @onchange="(e) => ToggleArticleSelection(article.ID, e)" />
+                                                </td>
+                                                <td>@article.ID</td>
+                                                <td>@article.Designation</td>
+                                                <td>@article.Marque</td>
+                                                <td>@article.Prix</td>
+                                                <td>
+                                                    @{
+                                                        var quantityValue = articleQuantities.ContainsKey(article.ID) ? articleQuantities[article.ID] : 0;
+                                                    }
+                                                    <input type="number" class="form-control" value="@quantityValue" @oninput="(e) => UpdateQuantity(article.ID, int.Parse(e.Value.ToString()))" placeholder="Quantity" min="1" />
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                      
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" @onclick="CreateAlimentation">Create Alimentation</button>
+    </div>
+</div>
+
+
+
+@code {
+    private DateTime selectedDate;
+    private AlimentationModel newAlimentation = new AlimentationModel();
+    private int selectedDepotId;
+    private Dictionary<int, int> articleQuantities = new Dictionary<int, int>();
+    private List<int> selectedArticleIds = new List<int>();
+    private int alimentationId;
+    private List<DepotModel> Depots { get; set; }
+    private List<ArticleModel> Articles { get; set; }
+    protected override async Task OnInitializedAsync()
+    {
+        selectedDate = DateTime.Today;
+        Depots = await GetDepots();
+        Articles = await GetArticles();
+        articleQuantities = Articles.ToDictionary(article => article.ID, _ => 1);
+    }
+
+    private async Task<List<DepotModel>> GetDepots()
+    {
+        return await _depotRepository.GetDepots();
+    }
+    private async Task<List<ArticleModel>> GetArticles()
+    {
+        return await _articleRepository.GetArticles();
+    }
+
+    private async Task CreateAlimentation()
+    {
+        try
+        {
+            // Calculate TotalPrice based on the selected Articles
+            decimal totalPrice = Articles
+     .Where(a => selectedArticleIds.Contains(a.ID))
+     .Sum(a => a.Prix * articleQuantities.GetValueOrDefault(a.ID, 1));
+
+
+            // Set TotalPrice for the new Alimentation
+            newAlimentation.TotalPrice = totalPrice;
+
+            // Call the new repository method to insert the new Alimentation
+            alimentationId = await _alimentationRepository.InsertAlimentationAsync(
+                selectedDate,
+                newAlimentation.TotalPrice,
+                selectedDepotId,
+                await GetAlimentationArticles());
+
+
+
+            await JSRuntime.InvokeVoidAsync("console.log", $"Alimentation Created: ID={alimentationId}");
+
+
+            // Reset the form or navigate to another page as needed
+            selectedDate = DateTime.Now;
+          
+            articleQuantities.Clear();
+            selectedArticleIds.Clear();
+            NavigationManager.NavigateTo("/alimentation");
+        }
+        catch (Exception ex)
+        {
+            // Handle the exception or log it
+            await JSRuntime.InvokeVoidAsync("alert", $"Error creating Alimentation: {ex.Message}");
+        }
+    }
+    private async Task<List<AlimentationArticleModel>> GetAlimentationArticles()
+    {
+        var selectedArticles = Articles.Where(a => selectedArticleIds.Contains(a.ID)).ToList();
+     
+        foreach (var article in selectedArticles)
+        {
+            var quantity = articleQuantities.TryGetValue(article.ID, out var q) ? q : 1;
+            await JSRuntime.InvokeVoidAsync("console.log", $"Selected Article: ID={article.ID}, Quantity={quantity}");
+        }
+
+        return selectedArticles
+            .Select(a => new AlimentationArticleModel
+                {
+                    ArticleID = a.ID,
+                    Quantity = articleQuantities.TryGetValue(a.ID, out var quantity) ? quantity : 1
+                })
+            .ToList();
+    }
+    private void UpdateQuantity(int articleId, int newQuantity)
+    {
+        if (articleQuantities.ContainsKey(articleId))
+        {
+            articleQuantities[articleId] = newQuantity;
+            Console.WriteLine($"Updated quantity for Article ID: {articleId} to {newQuantity}");
+        }
+        else
+        {
+            // Handle the case where the articleId is not in the dictionary
+            Console.WriteLine($"Article ID {articleId} not found in the dictionary.");
+        }
+    }
+
+
+
+
+
+  private async Task ToggleArticleSelection(int articleId, ChangeEventArgs e)
+    {
+        try
+        {
+           
+            await JSRuntime.InvokeVoidAsync("console.log", $"Toggling selection for Article ID: {articleId}");
+
+            if (e.Value is bool isChecked && isChecked)
+            {
+                selectedArticleIds.Add(articleId);
+                await JSRuntime.InvokeVoidAsync("console.log", $"Article Added ID: {articleId}");
+            }
+            else
+            {
+                selectedArticleIds.Remove(articleId);
+                await JSRuntime.InvokeVoidAsync("console.log", $"Article Removed ID: {articleId}");
+            }
+
+            // Debugging statement to display selectedArticleIds in the browser console
+            await JSRuntime.InvokeVoidAsync("console.log", $"Selected Article IDs: {string.Join(", ", selectedArticleIds)}");
+        }
+        catch (Exception ex)
+        {
+            // Handle the exception or log it
+            Console.WriteLine($"Error toggling article selection: {ex.Message}");
+
+            // Show error message
+            await JSRuntime.InvokeVoidAsync("alert", $"Error toggling article selection: {ex.Message}");
+        }
+   }
+}
+

@@ -1,0 +1,305 @@
+﻿@page "/de"
+@using Alimentations.Repositories
+@using Alimentations.Models
+@using Microsoft.JSInterop
+
+@inject DepotRepository DepotRepo
+
+<h3>Article Management</h3>
+
+
+<div class="mb-2">
+
+    <button class="btn btn-primary" @onclick="OpenModal">Create</button>
+    <button class="btn btn-primary" @onclick="ShowEditModal">Edit Selected</button>
+    <button class="btn btn-danger" @onclick="DeleteSelected">Delete Selected</button>
+</div>
+@if (depots != null && depots.Count > 0)
+{
+
+    <table class="table table-responsive-lg">
+        <thead>
+            <tr>
+                <th></th>
+                <th>ID</th>
+                <th>Designation</th>
+                <th>Ville</th>
+
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+
+            @foreach (var depot in depots)
+            {
+                <tr>
+                    <td>
+                        <input type="checkbox" id="check-@depot.ID" name="check" @onchange="@(async () => await ToggleSelectedRow(depot.ID))" value="@depot.ID"
+                               onclick="@(async () => await SetSelectedArticleIdForDeletion(depot.ID))" />
+
+                    </td>
+
+
+
+
+
+                    <td>@depot.ID</td>
+                    <td>@depot.Designation</td>
+                    <td>@depot.Ville</td>
+
+                    <td>@depot.Date.ToShortDateString()</td>
+                </tr>
+
+            }
+
+        </tbody>
+
+
+    </table>
+}
+else
+{
+    <h1> No depots for now</h1>
+}
+@if (showEditModal == true)
+{
+    <div class="modal show" tabindex="-1" role="dialog" style="display: block; border-radius: 8px;">
+        <!-- ... modal content ... -->
+
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Article</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" @onclick="HideEditModal">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <form>
+                        <div class="form-group">
+                            <label for="editId">ID:</label>
+                            <input type="text" class="form-control" id="editId" readonly value="@selectedDepot.ID" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="editDesignation">Designation:</label>
+                            <input type="text" class="form-control" id="editDesignation" @bind="selectedDepot.Designation" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="editMarque">Marque:</label>
+                            <input type="text" class="form-control" id="editMarque" @bind="selectedDepot.Ville" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="editDate">Date:</label>
+                            <input type="date" class="form-control" id="editDate" @bind="selectedDepot.Date" />
+                        </div>
+                    </form>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideEditModal">Close</button>
+                    <button type="button" class="btn btn-primary" @onclick="EditArticle">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@code {
+
+
+}
+@code {
+    private bool showEditModal = false;
+    private DepotModel selectedDepot;
+    private int selectedArticleIdForDeletion;
+    private void ShowEditModal()
+    {
+        showEditModal = true;
+    }
+
+    private void HideEditModal()
+    {
+        showEditModal = false;
+    }
+
+    async Task ToggleSelectedRow(int depotId)
+    {
+        if (selectedDepot != null && selectedDepot.ID == depotId)
+        {
+            selectedDepot = null;
+        }
+        else
+        {
+            selectedDepot = depots.FirstOrDefault(a => a.ID == depotId);
+        }
+    }
+    private async Task SetSelectedArticleIdForDeletion(int depotId)
+    {
+        if (selectedArticleIdForDeletion == depotId)
+        {
+            selectedArticleIdForDeletion = 0;
+        }
+        else
+        {
+            selectedArticleIdForDeletion = depotId; // Select the article for deletion
+        }
+    }
+
+
+    private async Task EditArticle()
+    {
+        if (selectedDepot != null)
+        {
+            // Call the repository method to update the article
+            await DepotRepo.UpdateDepot(selectedDepot.ID, selectedDepot.Designation, selectedDepot.Ville, selectedDepot.Date);
+
+            // Close the edit modal
+            HideEditModal();
+        }
+    }
+    private async Task DeleteSelected()
+    {
+        if (selectedArticleIdForDeletion != 0)
+        {
+            await DepotRepo.DeleteDepot(selectedArticleIdForDeletion);
+
+            // Clear the selected article ID for deletion
+            selectedArticleIdForDeletion = 0;
+        }
+        depots = await DepotRepo.GetDepots();
+    }
+
+
+
+
+
+
+}
+
+@if (isVisible == true)
+{
+    <div class="modal show" tabindex="-1" role="dialog" style="display: block; border-radius: 8px;">
+        <!-- ... modal content ... -->
+
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Article</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" @onclick="HideModal">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <form>
+                        <div class="form-group">
+                            <label for="id">Generated ID:</label>
+                            <input type="text" class="form-control" id="id" readonly value="@nextDepotId" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="designation">Designation:</label>
+                            <input type="text" class="form-control" id="designation" @bind="designation" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="marque">Marque:</label>
+                            <input type="text" class="form-control" id="ville" @bind="ville" />
+                        </div>
+
+
+
+                        <div class="form-group">
+                            <label for="date">Date:</label>
+                            <input type="date" class="form-control" id="date" @bind="date" />
+                        </div>
+                    </form>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideModal">Close</button>
+                    <button type="button" class="btn btn-primary" @onclick="AddDepot">Add Depot</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@code {
+
+    List<DepotModel> depots;
+
+    public string modalTitle = "";
+
+
+    private DepotModel newDepot = new DepotModel();
+    bool isVisible = false;
+
+    // Input values for the new article
+    string designation;
+    string ville;
+
+    DateTime date;
+
+    // ID for the new article
+    int nextDepotId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        depots = await DepotRepo.GetDepots();
+        // Retrieve the maximum existing ID from the database
+        nextDepotId = await DepotRepo.GetMaxDepotId() + 1;
+    }
+
+    async Task AddDepot()
+    {
+        // Call the repository method to add the articl
+        int generatedId = await DepotRepo.AddDepot(nextDepotId, designation, ville, date);
+
+        // Optionally, you can handle the generated ID or perform additional actions
+        Console.WriteLine($"Depot added with ID: {generatedId}");
+
+        // Close the modal
+        HideModal();
+        ClearForm();
+        depots = await DepotRepo.GetDepots();
+    }
+
+    void OpenModal()
+    {
+        // Set today's date as the default
+        date = DateTime.Now.Date;
+
+        isVisible = true;
+    }
+
+    void HideModal()
+    {
+        isVisible = false;
+    }
+
+    void ClearForm()
+    {
+        // Clear form fields
+        designation = string.Empty;
+        ville = string.Empty;
+
+        date = DateTime.Now.Date;
+    }
+}
+
+
+
+@code {
+
+
+
+
+
+
+
+
+}
+
